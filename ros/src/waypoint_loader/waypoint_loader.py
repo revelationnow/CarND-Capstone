@@ -35,7 +35,7 @@ class WaypointLoader(object):
             rospy.logerr('%s is not a file', path)
 
     def quaternion_from_yaw(self, yaw):
-        return tf.transformations.quaternion_from_euler(0., 0., yaw)
+        return tf.transformations.quaternion_from_euler(0., 0., yaw * 3.14159/ 180)
 
     def get_velocity(self, velocity):
         return velocity/3.6

@@ -43,7 +43,7 @@ class WaypointUpdater(object):
         self._pose = PoseStamped()
         self._pose_initialized = False
         self._waypoints_initialized = False
-        self._base_vel = 10
+        self._base_vel = 30/2.25
         self._debug_print = False
 
         self.go()
@@ -56,7 +56,7 @@ class WaypointUpdater(object):
             if(True == self._pose_initialized):
                 if(True == self._waypoints_initialized):
                     closest_wp = self.closest_waypoint()
-                    rospy.loginfo("Closest waypoint : " + str(self._waypoints.waypoints[closest_wp].pose.pose.position.x)
+                    rospy.loginfo("Closest waypoint : " + str(closest_wp) +" : "+ str(self._waypoints.waypoints[closest_wp].pose.pose.position.x)
                             + ", " + str(self._waypoints.waypoints[closest_wp].pose.pose.position.y))
                     final_wps = []
                     num_wps = len(self._waypoints.waypoints)
