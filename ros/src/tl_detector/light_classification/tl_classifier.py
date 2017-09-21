@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 import numpy as np
 import os
 import cv2
@@ -29,15 +30,15 @@ class TLClassifier(object):
     def __init__(self,mod):
         #TODO load classifier
         self.model = load_model(mod)
-        self.model._make_predict_function() 
+        self.model._make_predict_function()
         self.graph = tf.get_default_graph()
 
 
         return
 
     def get_classification(self, image):
-        self.image = image    
-        color1 = self.find_color()    
+        self.image = image
+        color1 = self.find_color()
         color2 = self.get_prediction()
 
         if color1 == TrafficLight.RED or color2 == TrafficLight.RED:
@@ -50,7 +51,7 @@ class TLClassifier(object):
         return TrafficLight.UNKNOWN
 
 
-    def reshape_image(self,image): 
+    def reshape_image(self,image):
         x = img_to_array(np.resize(image,(64,64,3)))
         return x[None,:]
 
@@ -69,21 +70,21 @@ class TLClassifier(object):
             else:
                 lower_mask = np.array([125,100,183],dtype = np.uint8)
                 upper_mask = np.array([75,255,255],dtype = np.uint8)
-        
+
             hsv_image = cv2.cvtColor(self.image,cv2.COLOR_BGR2HSV)
             mask = cv2.inRange(hsv_image,lower_mask,upper_mask)
-	    if 	color == TrafficLight.RED:
-	            mask = cv2.inRange(hsv_image,lower_mask1,upper_mask1)
+            if  color == TrafficLight.RED:
+                    mask = cv2.inRange(hsv_image,lower_mask1,upper_mask1)
 
             residual = cv2.bitwise_and(self.image,self.image,mask=mask)
             intensity = cv2.mean(self.image,mask=mask)
             #print("This is color speaking")
             #print(intensity)
             if intensity > 200:
-                return color  
- 
+                return color
 
-        return TrafficLight.UNKNOWN 
+
+        return TrafficLight.UNKNOWN
 
 
     def get_prediction(self):
@@ -97,7 +98,7 @@ class TLClassifier(object):
 
         """
         #TODO implement light color prediction
-        image=self.image    
+        image=self.image
 
         with self.graph.as_default():
             prediction = self.model.predict(self.reshape_image(image))
@@ -111,6 +112,6 @@ class TLClassifier(object):
                 return TrafficLight.RED
         if prediction[0][2] >  prediction[0][1] and prediction[0][2] >  prediction[0][0] :
                 return TrafficLight.YELLOW
-        return TrafficLight.UNKNOWN           
+        return TrafficLight.UNKNOWN
 
 

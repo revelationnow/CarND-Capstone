@@ -10,7 +10,7 @@ class Controller(object):
     def __init__(self, kp, ki, kd, min_lim, max_lim, wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle):
         # TODO: Implement
         self._pid_controller_throttle = PID(kp,ki,kd, min_lim, max_lim)
-        self._pid_controller_steer    = PID(15,0.04,0.9, -1, 1)
+        self._pid_controller_steer    = PID(3,0.04,3.0, -1, 1)
         self._yaw_controller = YawController(wheel_base,steer_ratio,min_speed,max_lat_accel,max_steer_angle)
         pass
 

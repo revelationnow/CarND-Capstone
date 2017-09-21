@@ -20,7 +20,7 @@ class WaypointLoader(object):
     def __init__(self):
         rospy.init_node('waypoint_loader', log_level=rospy.DEBUG)
 
-        self.pub = rospy.Publisher('/base_waypoints', Lane, queue_size=1)
+        self.pub = rospy.Publisher('/base_waypoints', Lane, queue_size=1, latch=True)
 
         self.velocity = rospy.get_param('~velocity')
         self.new_waypoint_loader(rospy.get_param('~path'))
@@ -35,7 +35,7 @@ class WaypointLoader(object):
             rospy.logerr('%s is not a file', path)
 
     def quaternion_from_yaw(self, yaw):
-        return tf.transformations.quaternion_from_euler(0., 0., yaw)
+        return tf.transformations.quaternion_from_euler(0., 0., yaw * 3.14159/ 180)
 
     def get_velocity(self, velocity):
         return velocity/3.6
@@ -72,14 +72,11 @@ class WaypointLoader(object):
         return waypoints
 
     def publish(self, waypoints):
-        rate = rospy.Rate(1)
-        while not rospy.is_shutdown():
-            lane = Lane()
-            lane.header.frame_id = '/world'
-            lane.header.stamp = rospy.Time(0)
-            lane.waypoints = waypoints
-            self.pub.publish(lane)
-            rate.sleep()
+        lane = Lane()
+        lane.header.frame_id = '/world'
+        lane.header.stamp = rospy.Time(0)
+        lane.waypoints = waypoints
+        self.pub.publish(lane)
 
 
 if __name__ == '__main__':
