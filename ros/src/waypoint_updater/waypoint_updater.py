@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 
@@ -45,6 +45,7 @@ class WaypointUpdater(object):
         self._waypoints_initialized = False
         self._base_vel = 10
         self._debug_print = False
+        self._stop_line_position = Point();
 
         self.go()
 
@@ -120,13 +121,13 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-		self._traffic_waypoint_id=msg
-		self._stop_line_position.x=self._waypoints.waypoints[self._traffic_waypoint_id].pose.pose.position.x-20.991  #according to site_traffic_light_config.yaml
-		self._stop_line_position.y=self._waypoints.waypoints[self._traffic_waypoint_id].pose.pose.position.y-22.837	#according to site_traffic_light_config.yaml
-		self.get_stop_waypoint()
-		self.set_waypoints_to_stop()
-			
-	def get_stop_waypoint(self):
+        self._traffic_waypoint_id = msg.data
+        self._stop_line_position.x = self._waypoints.waypoints[self._traffic_waypoint_id].pose.pose.position.x-20.991  #according to site_traffic_light_config.yaml
+        self._stop_line_position.y = self._waypoints.waypoints[self._traffic_waypoint_id].pose.pose.position.y-22.837     #according to site_traffic_light_config.yaml
+        self.get_stop_waypoint()
+        self.set_waypoints_to_stop()
+
+    def get_stop_waypoint(self):
         min_dist = 99999999
         stop_waypoint_id = 99999999
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  )
@@ -137,36 +138,40 @@ class WaypointUpdater(object):
                 min_dist = dist
                 stop_waypoint_id = i
             i = i - 1
-		stop_waypoint_id=stop_waypoint_id-2   # margin N: stop about N points timeslots before the stop line
-		self._stop_waypoint_id=stop_waypoint_id
-		
-	def set_waypoints_to_stop(self):
+            stop_waypoint_id = stop_waypoint_id - 2   # margin N: stop about N points timeslots before the stop line
+            self._stop_waypoint_id = stop_waypoint_id
+
+    def set_waypoints_to_stop(self):
         out_msg = Lane()
-		final_wps = []
-		total_distance=0
-		total_dealta_t=0
-		#self._waypoints.waypoints[0].twist.twist.linear.x = self._base_vel
-		for i in range(self._stop_waypoint_id,0,-1):
-			total_distance+=distance(self._waypoints.waypoints,i, i-1)
-			total_dealta_t=self._waypoints.waypoints[i].twist.header.stamp-self._waypoints.waypoints[i-1].twist.header.stamp
-		deaceleration=math.sqrt(2.0*total_distance/total_dealta_t/total_dealta_t)
-		if(deaceleration>10):
-			rospy.logerr("the deaceleration is higher than 10 m2/s")
-			
+        final_wps = []
+        total_distance = 0
+        total_delta_t = 0
+
+        #self._waypoints.waypoints[0].twist.twist.linear.x = self._base_vel
+        for i in range(self._stop_waypoint_id, 0, -1):
+            total_distance += distance(self._waypoints.waypoints,i, i-1)
+            total_delta_t = self._waypoints.waypoints[i].twist.header.stamp -
+                                     self._waypoints.waypoints[i-1].twist.header.stamp
+
+        deaceleration = math.sqrt(2.0 * total_distance/total_delta_t/total_delta_t)
+
+        if(deaceleration>10):
+            rospy.logerr("the deaceleration is higher than 10 m2/s")
+
         for i in range(LOOKAHEAD_WPS-1 ):
-			if(i>=self._stop_waypoint_id):
-				self._waypoints.waypoints[i].twist.twist.linear.x =0
-			else:
-				dealta_t=self._waypoints.waypoints[i+1].twist.header.stamp-self._waypoints.waypoints[i].twist.header.stamp
-				self._waypoints.waypoints[i].twist.twist.linear.x=self._base_vel-deaceleration*dealta_t
+            if(i >= self._stop_waypoint_id):
+                self._waypoints.waypoints[i].twist.twist.linear.x = 0
+            else:
+                dealta_t = self._waypoints.waypoints[i+1].twist.header.stamp-self._waypoints.waypoints[i].twist.header.stamp
+                self._waypoints.waypoints[i].twist.twist.linear.x = self._base_vel - deaceleration * dealta_t
 
             final_wps.append(self._waypoints.waypoints[i])
 
         out_msg.waypoints = final_wps
-        self.final_waypoints_pub.publish(out_msg)		
-	
+        self.final_waypoints_pub.publish(out_msg)
 
-		
+
+
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
