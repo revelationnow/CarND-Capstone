@@ -108,6 +108,18 @@ class WaypointUpdater(object):
                       light_wp,
                       len(self._waypoints.waypoints))
 
+        v_exp = math.sqrt(2 * a * self.distance(self._waypoints.waypoints, curr_wp, light_wp))
+
+        danger = False
+
+        if( v_exp < v_local):
+            danger = True
+
+        if( danger == True):
+            a = a + 5 * (v_local - v_exp)
+
+
+
         for i in range(LOOKAHEAD_WPS):
             check_wp = (curr_wp + i + 1) % num_wp
             prev_wp  = (curr_wp + i) % num_wp

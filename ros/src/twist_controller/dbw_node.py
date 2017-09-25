@@ -46,7 +46,7 @@ class DBWNode(object):
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
         kp = 0.3
-        ki = 0.01
+        ki = 0.0
         kd = 0.05
 
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
