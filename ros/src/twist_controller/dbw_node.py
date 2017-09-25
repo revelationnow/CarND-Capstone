@@ -45,9 +45,9 @@ class DBWNode(object):
         steer_ratio = rospy.get_param('~steer_ratio', 14.8)
         max_lat_accel = rospy.get_param('~max_lat_accel', 3.)
         max_steer_angle = rospy.get_param('~max_steer_angle', 8.)
-        kp = 0.5
-        ki = 0.001
-        kd = 0.1
+        kp = 0.3
+        ki = 0.01
+        kd = 0.05
 
         self.steer_pub = rospy.Publisher('/vehicle/steering_cmd',
                                          SteeringCmd, queue_size=1)
@@ -84,7 +84,7 @@ class DBWNode(object):
             cur_vel_mag = 0.0
 
             if(mag_based == False):
-                lin_vel = self._twist_stamped.twist.linear.x
+                lin_vel = self._twist_stamped.twist.linear.x if self._twist_stamped.twist.linear.x > 1 else 0
                 ang_vel = self._twist_stamped.twist.angular.z
                 cur_vel_mag = self._curr_vel.linear.x
             else:
@@ -102,7 +102,7 @@ class DBWNode(object):
                                                                  self._dbw_enabled.data,
                                                                  dt)
             if self._dbw_enabled.data == True:
-               self.publish(throttle, brake, steering)
+               self.publish(throttle, brake, steering, lin_vel)
             rate.sleep()
 
     def cur_vel_cb(self, msg):
@@ -111,13 +111,15 @@ class DBWNode(object):
     def twist_cmd_cb(self, msg):
         self._twist_stamped = msg
         rospy.loginfo("Received new twist message : Linear_x : " + str(self._twist_stamped.twist.linear.x))
-        rospy.loginfo("Received new twist message : Angular_x : " + str(self._twist_stamped.twist.angular.x))
+        rospy.loginfo("Received new twist message : Angular_z : " + str(self._twist_stamped.twist.angular.z))
 
     def dbw_enabled_cb(self, msg):
+        if(self._dbw_enabled.data != msg.data):
+            self.controller.reset()
         self._dbw_enabled = msg
 
-    def publish(self, throttle, brake, steer):
-        if(throttle != 0):
+    def publish(self, throttle, brake, steer, lin_vel):
+        if(throttle != 0 and abs(lin_vel - self._curr_vel.linear.x) > 0.3):
             tcmd = ThrottleCmd()
             tcmd.enable = True
             tcmd.pedal_cmd_type = ThrottleCmd.CMD_PERCENT
