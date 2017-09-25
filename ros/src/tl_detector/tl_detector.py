@@ -6,6 +6,7 @@ from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane, Waypoint
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from matplotlib.pyplot import imsave
 from light_classification.tl_classifier import TLClassifier
 from light_classification.tl_identifier import TLIdentifier
 import tf
@@ -16,7 +17,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-MANUAL = True
+MANUAL = False
 
 class TLDetector(object):
     def __init__(self):
@@ -33,9 +34,9 @@ class TLDetector(object):
 	self.light_cnt = 999
         
         self.bridge = CvBridge()
-        self.light_identifier = TLIdentifier('ALL',1,'./light_classification/traffic_light_identifier.h5')
+        self.light_identifier = TLIdentifier(1,'ALL','./light_classification/traffic_light_identifier.h5')
         self.light_classifier = TLClassifier('./light_classification/traffic_light_classifier.h5')
-        self.light_identifier.set_window(100,700,100,600)
+        self.light_identifier.set_window(0,800,100,600)
         self.listener = tf.TransformListener()
 
         self.debug_success_counter = 0
@@ -67,7 +68,8 @@ class TLDetector(object):
 	return
 
     def waypoints_cb(self, waypoints):
-        self.waypoints = waypoints
+        if (waypoints):
+            self.waypoints = waypoints
 	return
 
     def traffic_cb(self, msg):
@@ -77,7 +79,7 @@ class TLDetector(object):
     def image_cb(self, msg):
         self.has_image = True
         self.camera_image = msg
-
+        
         light_wp, state = self.process_traffic_lights()
 
         #rospy.loginfo("Base Waypoints %s",light_wp)
@@ -203,41 +205,49 @@ class TLDetector(object):
 
 	# Get Image
 	self.camera_image.encoding = "rgb8"
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-       
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
+        except CvBridgeError as e:
+            print(e)
 	#x, y = self.project_to_image_plane(light.position)
  	#cv_image =  cv_image[x-15:x+15,y-35:y+35]
          
    
-	if MANUAL :
+	if MANUAL:
 		# If manual or data gathering mode get image ..state is known
 
                 dirname  = "" 		               
         	state = self.lights[self.light_cnt].state
+                found , light_image = self.light_identifier.process_image(cv_image)
+		if state == 3:
+                    state = self.light_identifier.color   
+		file_name = str(self.lights[self.light_cnt].header.seq)+"_"+str(self.lights[self.light_cnt].header.stamp)+"_"+str(self.state)+".jpg"              
 
-		found , light_image = self.light_identifier.process_image(cv_image)	
-		file_name = str(self.lights[self.light_cnt].header.seq)+"_"+str(self.lights[self.light_cnt].header.stamp)+"_"+str(self.state)+".jpg"
-               
 		if found is True:
                         self.debug_success_counter += 1  
                         state_try = self.light_classifier.get_classification(light_image)
                         rospy.loginfo("Ground Truth Light State  %s", state)
                         rospy.loginfo("Light State Predicted  %s",state_try)  
+
                         if state_try == state:
-                            rospy.loginfo("SUCCESS Identified Traffic Light.. %f Success rate",100*self.debug_success_counter/(self.debug_success_counter+self.debug_fail_counter))
-			    if state == TrafficLight.RED:
-				dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/red'
-			    elif state == TrafficLight.GREEN:
-				dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/green'
-			    else:
-				dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/yellow'
+                            rospy.loginfo("SUCCESS Identified and Classified Traffic Light.. %f Success rate",100*self.debug_success_counter/(self.debug_success_counter+self.debug_fail_counter))
+                        else:
+                            rospy.loginfo(" FAILURE Traffic Light Classification Test Failed.. %f",self.debug_fail_counter) 		
 
-                if found is False or state_try != state:
-                        rospy.loginfo(" FAILURE Traffic Light Identification Test Failed.. %f",self.debug_fail_counter) 		
+   	                if state == TrafficLight.RED:
+		            dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/training/red'
+		        elif state == TrafficLight.GREEN:
+		            dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/training/green'
+		        else:
+		            dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/training/yellow'
+
+
+                if found is False:
                         self.debug_fail_counter += 1  
-			dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/'
+                        rospy.loginfo(" FAILURE Traffic Light Identification Test Failed.. %f", self.debug_fail_counter) 		
+			dirname = expanduser("~")+'/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/training/'
+ 		imsave(os.path.join( dirname,file_name),light_image)
 
-		#cv2.imwrite(os.path.join( dirname,file_name),light_image)
 	else:
 
 		#Identify Light
@@ -246,7 +256,10 @@ class TLDetector(object):
 		if found == True:
 			#Get light classification 
 			state = self.light_classifier.get_classification(light_image)
-
+                        rospy.loginfo(" SUCCESS Traffic Light Classification done as Preliminary analysis %s .. Final Classification %s",self.light_identifier.color,state)
+                else:
+                        state = TrafficLight.UNKNOWN
+                        rospy.loginfo(" FAIL Traffic Light Identification Test Failed.. ")        
 	return state #self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
@@ -259,10 +272,11 @@ class TLDetector(object):
 
         """
         light_positions = self.config['light_positions']
-        light = None 
+        light = None
+        self.light_cnt = None   
         best_dist = 150
- 
-        if(self.pose) and (self.waypoints) :
+
+        if (self.pose) and (self.waypoints) :
 
             # Get the closest waypoint ahead of the car. Not a compulsory step - can use the car pose instead but this mkes things easier later..             
             car_position = self.get_next_waypoint(self.pose.pose)
@@ -275,29 +289,40 @@ class TLDetector(object):
             for light_no in range(len(light_positions)): 
                if light_positions[light_no][0] >= self.waypoints.waypoints[car_position].pose.pose.position.x:
     	            dist = dl(light_positions[light_no],self.waypoints.waypoints[car_position].pose.pose.position)
-                    #rospy.loginfo("Closes Light Ahead detected (from closest wayoint ahead) )%s",light_no) 
+                    #rospy.loginfo("Light not %s at %s has distance %s and state %s",light_no,light_positions[light_no][0],dist,self.lights[light_no].state) 
+
 	            if dist < best_dist:
 		        best_dist = dist	
-                        self.light_cnt = light_no 
-                        #rospy.loginfo("Distance to closes Waypoint from Light ahead is %s",dist) 
-                        rospy.loginfo("LIGHT PROCESSING START: Approching Light ahead... %s,%s",light_positions[self.light_cnt][0],light_positions[self.light_cnt][1]) 
- 
-                   
-			# create the light pose
-  		        pose = Pose()
-			pose.position.x = light_positions[self.light_cnt][0]
-			pose.position.y = light_positions[self.light_cnt][1]	
-			light = pose
+                        self.light_cnt = light_no  
+                
 			
         # get the state
-        if light is not None:
-            light_wp = self.get_closest_waypoint(light) 
+        if self.light_cnt is not None:
 
+            #rospy.loginfo("Closes Light Ahead detected (from closest wayoint ahead) )%s",self.light_cnt) 
+            #rospy.loginfo("Distance to closes Waypoint from Light ahead is %s",best_dist) 
+            #rospy.loginfo("LIGHT PROCESSING START: Approaching Light ahead... %s,%s",light_positions[self.light_cnt][0],light_positions[self.light_cnt][1]) 
+
+   	    # create the light pose
+            pose = Pose()
+	    pose.position.x = light_positions[self.light_cnt][0]
+	    pose.position.y = light_positions[self.light_cnt][1]	
+	    light = pose
+
+            light_wp = self.get_closest_waypoint(light)
+            '''   
+            if best_dist >  75:
+                self.light_identifier.counter = 1
+            elif 75 < best_dist  < 50 :
+                self.light_identifier.counter = 2
+            else:
+                self.light_identifier.counter = 3
+            '''
             state = self.get_light_state(light)
             return light_wp, state
         #else:
             #rospy.loginfo("No light detected ahead ..") 
-        self.waypoints = None
+        #self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 

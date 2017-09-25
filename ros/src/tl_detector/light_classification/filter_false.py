@@ -11,7 +11,7 @@ cache_length=0
 import time
 from PIL import Image
 
-def add_heat(heatmap, bbox_list, found,circles):
+def add_heat(heatmap, bbox_list, found):
  
     # Iterate through list of bboxes
     i=0
@@ -19,10 +19,8 @@ def add_heat(heatmap, bbox_list, found,circles):
         # Assuming each "box" takes the form ((x1, y1), (x2, y2))
         if i < len(found) :
             heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += found[i]
-        if i < len(circles) :
-            heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += len(circles[i])
-
-        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+        else:
+            heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
         i=i+1
 
     # Return updated heatmap
@@ -35,10 +33,11 @@ def apply_threshold(heatmap, threshold):
     return heatmap
 
 
-def filter_false(image,  box_list, found,circles):
+def filter_false(image,  box_list, found):
     # Read in a pickle file with bboxes saved
     # Each item in the "all_bboxes" list will contain a 
     # list of boxes for one of the frames processed before
+    
     global cache,cache_length
 
     cache_length+=1
@@ -48,15 +47,15 @@ def filter_false(image,  box_list, found,circles):
         cache = box_list
     else:
         cache = box_list + cache    
- 
+    
     # Read in image similar to one shown above 
     heat = np.zeros_like(image[:,:,0]).astype(np.float)
 
     # Add heat to each box in box list
-    heat = add_heat(heat,box_list,found,circles)
+    heat = add_heat(heat,box_list,found)
     
     # Apply threshold to help remove false positives
-    heatmap = apply_threshold(heat,5)
+    heatmap = apply_threshold(heat,3)
 
     # Visualize the heatmap when displaying    
     #heatmap = np.clip(heatmap, 0, 255)
