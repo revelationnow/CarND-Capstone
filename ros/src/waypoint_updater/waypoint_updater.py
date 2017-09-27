@@ -43,7 +43,8 @@ class WaypointUpdater(object):
         self._pose = PoseStamped()
         self._pose_initialized = False
         self._waypoints_initialized = False
-        self._base_vel = 30/2.25
+        #self._base_vel = 30/2.25
+        self._base_vel = rospy.get_param('/waypoint_loader/velocity')/3.6
         self._debug_print = False
         self._stop_line_position = Point()
         self._light_waypoint = INVALID_WP_ID
@@ -116,7 +117,7 @@ class WaypointUpdater(object):
             danger = True
 
         if( danger == True):
-            a = a + 5 * (v_local - v_exp)
+            a = a + 10 * (v_local - v_exp)
 
 
 

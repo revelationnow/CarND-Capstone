@@ -5,7 +5,8 @@ from keras.models import Sequential
 batch_size = 32
 nb_epoch = 10
 nb_classes = 3
-nb_steps = 204
+nb_train_samples = 7000
+nb_validation_samples = 3000
 image_shape = [64, 64, 3]
 
 model = Sequential()
@@ -34,15 +35,21 @@ model.add(Dense(512))
 model.add(Dropout(rate=0.5, trainable=True, name="dropout_5"))
 model.add(Dense(128))
 model.add(Dropout(rate=0.5, trainable=True, name="dropout_6"))
-model.add(Dense(nb_classes))
+model.add(Dense(nb_classes, activation='softmax'))
 model.summary()
 
-model.compile(loss='mse',optimizer='adam', metrics=['accuracy'])
+model.compile(loss='categorical_crossentropy',optimizer='adam', metrics=['accuracy'])
 
-datagen = ImageDataGenerator(width_shift_range=.2, height_shift_range=.2, shear_range=0.05, zoom_range=.1,fill_mode='nearest', rescale=1. / 255)
+train_datagen = ImageDataGenerator(rotation_range=40, width_shift_range=.2, height_shift_range=.2, shear_range=0.05, zoom_range=.1,horizontal_flip=True,fill_mode='nearest', rescale=1. / 255)
 
-image_data_gen = datagen.flow_from_directory('/home/student/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images', target_size=(64, 64), classes=['green', 'red', 'yellow'],batch_size=batch_size)
+train_generator = train_datagen.flow_from_directory('/home/student/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/training', target_size=(64, 64), batch_size=batch_size, class_mode='categorical')
 
-model.fit_generator(image_data_gen, epochs=nb_epoch, steps_per_epoch=nb_steps)
+test_datagen = ImageDataGenerator(rotation_range=40, width_shift_range=.2, height_shift_range=.2, shear_range=0.05, zoom_range=.1,horizontal_flip=True,fill_mode='nearest', rescale=1. / 255)
+
+test_generator = test_datagen.flow_from_directory('/home/student/catkin_ws/src/CarND-Capstone/ros/src/tl_detector/light_classification/images/validation', target_size=(64, 64), batch_size=batch_size, class_mode='categorical')
+
+model.fit_generator(train_generator, epochs=nb_epoch, steps_per_epoch=nb_train_samples // batch_size , validation_steps=nb_validation_samples // batch_size, validation_data=test_generator  )
+
+print(train_generator.class_indices)
 
 model.save('traffic_light_classifier.h5')
