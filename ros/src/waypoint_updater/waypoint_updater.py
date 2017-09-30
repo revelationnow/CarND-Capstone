@@ -99,10 +99,10 @@ class WaypointUpdater(object):
             self._keep_vel_flag = True
             self._keep_vel_val = curr_vel
 
-        a = 5
-        s = 10 + (v_local * v_local)/(2 * a)
+        a = 7
+        s = (v_local * v_local)/(2 * a)
         num_wp = len(self._waypoints.waypoints)
-        first_dec_wp = self.get_wp_at_distance_before(s, light_wp)
+        first_dec_wp = self.get_wp_at_distance_before(s + 15, light_wp)
         rospy.loginfo("Curr_vel = %d, s = %d",curr_vel, s)
         rospy.loginfo("First waypoint to decrease speed : %d",first_dec_wp)
         rospy.loginfo("Light waypoint : %d, num_waypoints = %d",

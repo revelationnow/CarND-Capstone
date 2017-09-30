@@ -19,6 +19,7 @@ from os.path import expanduser
 import cv2
 import yaml
 import math
+import time
 
 STATE_COUNT_THRESHOLD = 1
 MANUAL = False
@@ -37,7 +38,8 @@ class TLDetector(object):
         self.state_count = 0
         self.light_cnt = 999
         self.bridge = CvBridge()
-        self.light_identifier = TLIdentifier(1,'ALL','./light_classification/traffic_light_identifier.h5')
+        #self.light_identifier = TLIdentifier(1,'ALL','./light_classification/traffic_light_identifier.h5')
+        self.light_identifier = TLIdentifier(1,3,'./light_classification/traffic_light_identifier.h5')
         self.light_classifier = TLClassifier('./light_classification/traffic_light_classifier.h5')
         self.light_identifier.set_window(0,800,100,600)
         self.listener = tf.TransformListener()
@@ -263,11 +265,17 @@ class TLDetector(object):
 	else:
 
                 #Identify Light
+                start = time.time()
                 found,light_image = self.light_identifier.process_image(cv_image)
+                end = time.time()
+                rospy.loginfo("Time taken to identify : %f", end-start)
 
 		if found == True:
 			#Get light classification
+                        start = time.time()
 			state = self.light_classifier.get_classification(light_image)
+                        end = time.time()
+                        rospy.loginfo("Time taken to classify : %f", end-start)
                         rospy.loginfo(" SUCCESS Traffic Light Classification done as Preliminary analysis %s .. Final Classification %s",self.light_identifier.color,state)
                 else:
                         state = TrafficLight.UNKNOWN
@@ -286,7 +294,7 @@ class TLDetector(object):
         light_positions = self.config['stop_line_positions']
         light = None
         self.light_cnt = None
-        best_dist = 150
+        best_dist = 50
 
         if (self.pose) and (self.waypoints) :
 
@@ -294,17 +302,18 @@ class TLDetector(object):
             # can use the car pose instead but this mkes things easier later..
             car_position = self.get_next_waypoint(self.pose.pose)
 
-            dl = lambda a, b: math.sqrt((a[0]-b.x)**2 + (a[1]-b.y)**2 )
+            dl_light = lambda a, b: math.sqrt((a[0]-b.x)**2 + (a[1]-b.y)**2 )
+            dl_wayp  = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
 
             # Get the closest light ahead
             for light_no in range(len(light_positions)):
-               if light_positions[light_no][0] >= self.waypoints.waypoints[car_position].pose.pose.position.x:
-    	            dist = dl(light_positions[light_no],self.waypoints.waypoints[car_position].pose.pose.position)
+               #if light_positions[light_no][0] >= self.waypoints.waypoints[car_position].pose.pose.position.x:
+    	        dist = dl_light(light_positions[light_no],self.waypoints.waypoints[car_position].pose.pose.position)
                     #rospy.loginfo("Light not %s at %s has distance %s and state %s",light_no,light_positions[light_no][0],dist,self.lights[light_no].state)
 
-	            if dist < best_dist:
-		        best_dist = dist
-                        self.light_cnt = light_no
+	        if dist < best_dist:
+		    best_dist = dist
+                    self.light_cnt = light_no
 
 
         # get the state
@@ -321,6 +330,16 @@ class TLDetector(object):
 	    light = pose
 
             light_wp = self.get_closest_waypoint(light)
+
+            num_wp = len(self.waypoints.waypoints)
+            dist_best_wp_next_wp = dl_wayp(self.waypoints.waypoints[light_wp].pose.pose.position,
+                                      self.waypoints.waypoints[(light_wp + 1) % num_wp].pose.pose.position)
+            dist_light_next_wp = dl_light(light_positions[light_no],
+                                    self.waypoints.waypoints[(light_wp + 1) % num_wp].pose.pose.position)
+
+            if(dist_best_wp_next_wp < dist_light_next_wp):
+                light_wp = (light_wp - 1 + num_wp)%num_wp
+
             '''
             if best_dist >  75:
                 self.light_identifier.counter = 1

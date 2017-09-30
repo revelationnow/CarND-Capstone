@@ -14,6 +14,7 @@ from sklearn.metrics import accuracy_score
 from tl_classifier import TLClassifier
 from styx_msgs.msg import TrafficLight
 import uuid
+import rospy
 
 class TLIdentifier(object):
 
@@ -24,17 +25,17 @@ class TLIdentifier(object):
         self.color = None
         self.lower_mask = []
         self.upper_mask = []
-        self.colorl = []        
-        self.colorl.append(TrafficLight.RED)    
-        self.colorl.append(TrafficLight.GREEN)    
-        self.colorl.append(TrafficLight.YELLOW)            
+        self.colorl = []
+        self.colorl.append(TrafficLight.RED)
+        self.colorl.append(TrafficLight.GREEN)
+        self.colorl.append(TrafficLight.YELLOW)
         self.lower_mask.append(np.array([0,50,50],dtype = np.uint8))
         self.upper_mask.append(np.array([10,255,255],dtype = np.uint8))
         self.lower_mask.append(np.array([58,100,100],dtype = np.uint8))
         self.upper_mask.append(np.array([100,255,255],dtype = np.uint8))
 
         self.lower_mask.append(np.array([25,40,100],dtype = np.uint8))
-        self.upper_mask.append(np.array([45,255,255],dtype = np.uint8)) 
+        self.upper_mask.append(np.array([45,255,255],dtype = np.uint8))
         self.lower_mask.append(np.array([150,50,50],dtype = np.uint8))
         self.upper_mask.append(np.array([179,255,255],dtype = np.uint8))
     def set_window(self,xstart,xstop,ystart,ystop):
@@ -46,37 +47,40 @@ class TLIdentifier(object):
         return
 
     def process_image(self,img):
-        self.img = img 
+        self.img = img
         box_list1 = box_list2 = box_list3 = []
         found1 = found2 = found3 = []
 
         if self.counter==1 or self.counter=='ALL':
             xy_window = (40,80)
+            start = time.time()
             box_list1,found1 = self.find_object(xy_window)
+            end = time.time()
+            rospy.loginfo("Time taken in find object : %f", end-start)
 
         if self.counter==2 or self.counter=='ALL':
             xy_window = (60,120)
             box_list2,found2 = self.find_object(xy_window)
 
-        if self.counter==3 or self.counter=='ALL':      
-            xy_window = (80,160)        
+        if self.counter==3 or self.counter=='ALL':
+            xy_window = (80,160)
             box_list3,found3 = self.find_object(xy_window)
-        
+
         box_list = box_list1 + box_list2 + box_list3
         found = found1 + found2 + found3
         box = filter_false(self.img,box_list, found)
-        #i = 0 
+        #i = 0
 	#for box in box_list:
              #new_img = cv2.rectangle(img,box[0],box[1],(0,0,255),0 )
              #plt.imshow(new_img)
-             #plt.title('Final')                
+             #plt.title('Final')
              #plt.show()
              #print(found[i])
-             #i = i +1  
+             #i = i +1
         if box[0][1] == 0:
 	    return False,self.img
 
-        out_img = np.copy(self.img[box[0][1]:box[1][1], box[0][0]:box[1][0]])       
+        out_img = np.copy(self.img[box[0][1]:box[1][1], box[0][0]:box[1][0]])
         return True,out_img
 
     def reshape_image(self,image):
@@ -88,7 +92,7 @@ class TLIdentifier(object):
         return image
 
     def read_image_files(self,rootdir):
-        files=[] 
+        files=[]
         onlyfiles = [f for f in os.listdir(rootdir) if os.path.isfile(os.path.join(rootdir, f))]
         for file in onlyfiles:
             if not file.startswith('.'):
@@ -101,15 +105,15 @@ class TLIdentifier(object):
         for filename in os.listdir(rootdir):
             if not filename.startswith('.'):
                   image = cv2.imread(rootdir+filename)
-                  
-                  imageresized = cv2.resize(image,(40,80), interpolation = cv2.INTER_AREA)
-                  cv2.imwrite( targetdir + filename ,imageresized ) 
 
-                
+                  imageresized = cv2.resize(image,(40,80), interpolation = cv2.INTER_AREA)
+                  cv2.imwrite( targetdir + filename ,imageresized )
+
+
         return True
 
-    def create_pos_n_neg(self):     
-        for file_type in ['light','unknown']: 
+    def create_pos_n_neg(self):
+        for file_type in ['light','unknown']:
             for img in os.listdir(file_type):
 
                 if file_type == 'light':
@@ -125,7 +129,7 @@ class TLIdentifier(object):
     def find_object(self, xy_window=(35, 80), xy_overlap =(0.5, 0.5) , scale = 1):
         found_lights =[]
         found_arr = []
-   
+
         draw_img = np.copy(self.img)
 
         if scale != 1:
@@ -138,11 +142,11 @@ class TLIdentifier(object):
         else:
             x_start_stop = [0,draw_img.shape[1]]
             y_start_stop = [0,draw_img.shape[0]]
-            
+
         # Compute the span of the region to be searched
         spanx = x_start_stop[1] - x_start_stop[0]
         spany = y_start_stop[1] - y_start_stop[0]
-        
+
         # Compute the number of pixels per step in x/y
         stepSize_x= int((1-xy_overlap[0])*xy_window[0])
         stepSize_y= int((1-xy_overlap[1])*xy_window[1])
@@ -150,52 +154,52 @@ class TLIdentifier(object):
         # Compute the number of windows in x/y
         nx_buffer = np.int(xy_window[0]*(xy_overlap[0]))
         ny_buffer = np.int(xy_window[1]*(xy_overlap[1]))
-        nx_windows = np.int((spanx-nx_buffer)/stepSize_x) 
-        ny_windows = np.int((spany-ny_buffer)/stepSize_y) 
-              
+        nx_windows = np.int((spanx-nx_buffer)/stepSize_x)
+        ny_windows = np.int((spany-ny_buffer)/stepSize_y)
+
         for iy in range(ny_windows):
             for ix in range(nx_windows):
                 found = 0
-                rectangle = False 
+                rectangle = False
 
                 startx = ix*stepSize_x + x_start_stop[0]
                 endx = startx + xy_window[0]
                 starty = iy*stepSize_y + y_start_stop[0]
                 endy = starty + xy_window[1]
- 
+
                 # Extract the image patch
                 subimg = self.img[starty:endy,startx:endx]
 
                 #Check for Hough circles
 
                 if self.methods == 1 or self.methods=='ALL':
-                    if self.find_colors(subimg): 
+                    if self.find_colors(subimg):
                         found += 1
-		        if  self.methods==2 or self.methods=='ALL' :
-		            if self.find_contours(subimg) :
-		                found += 1        
-		        if self.methods==3 or self.methods=='ALL':
-		            #CNN               
-		            if self.find_circles(subimg) :
-		                found += 1
-                            
+		if  self.methods==2 or self.methods=='ALL' :
+		    if self.find_contours(subimg) :
+		        found += 1
+		if self.methods==3 or self.methods=='ALL':
+		    #CNN
+		    if self.find_circles(subimg) :
+		        found += 1
+
                 x_start_scale = np.int(startx*scale)
                 y_start_scale = np.int(starty*scale)
                 x_end_scale = np.int(endx*scale)
                 y_end_scale = np.int(endy*scale)
 
-      
+
                 if found > 0:
                    found_lights.append(((x_start_scale, y_start_scale),(x_end_scale,y_end_scale)))
-                   found_arr.append(found) 
+                   found_arr.append(found)
 
-                #if found > 50: 
+                #if found > 50:
                    #return found_lights,found_arr,circle_arr
-                                           
+
         return found_lights,found_arr
 
 
- 
+
     def find_contours(self,image):
 
         bilateral_filtered_image = cv2.bilateralFilter(image, 5, 175, 175)
@@ -212,7 +216,7 @@ class TLIdentifier(object):
                 #cv2.waitKey(0)
                 #cv2.destroyAllWindows()
                 return True
-        #return len(contours)        
+        #return len(contours)
         #return cv2.drawContours(image, contour_list,  -1, (255,0,0), 2)
         return False
 
@@ -224,29 +228,29 @@ class TLIdentifier(object):
         src_gray  = cv2.GaussianBlur(src_gray, (15,15), 2, 2 )
 
         # Apply the Hough Transform to find the circles
-        circles =   cv2.HoughCircles( src_gray, cv2.HOUGH_GRADIENT,1,100,param1=50,param2=30,minRadius=0,maxRadius=50) 
-		
+        circles =   cv2.HoughCircles( src_gray, cv2.HOUGH_GRADIENT,1,100,param1=50,param2=30,minRadius=0,maxRadius=50)
+
 	if circles is not None:
             #circles = np.round(circles[0, :]).astype("int")
  	    #for (x, y, r) in circles:
                 #plt.imshow(cv2.circle(image,(x,y),r,(0,255,0),2))
-	        #plt.title('Circles')                
+	        #plt.title('Circles')
                 #plt.show()
                 #cv2.destroyAllWindows()
-                return True    
-        
-        return False 
+                return True
+
+        return False
 
     def find_rectangles(self,image):
 
  	gray = cv2.cvtColor( image,  cv2.COLOR_BGR2GRAY )
 
-        bilateral_filtered_image = cv2.bilateralFilter(gray, 1, 10, 120)       
+        bilateral_filtered_image = cv2.bilateralFilter(gray, 1, 10, 120)
         edge_detected_image = cv2.Canny(bilateral_filtered_image,50, 150)
         '''
         filtered_image = cv2.GaussianBlur(gray, (3, 3), 0)
-        
-        #edge_detected_image = cv2.threshold(bilateral_filtered_image, 60, 255, cv2.THRESH_BINARY)[1]       
+
+        #edge_detected_image = cv2.threshold(bilateral_filtered_image, 60, 255, cv2.THRESH_BINARY)[1]
 
         rho = 1
 	theta = np.pi/180
@@ -263,14 +267,14 @@ class TLIdentifier(object):
 	except:
             return False
         h_v = w_v = []
-        h = w =0 
+        h = w =0
 	for line in lines:
             for x1,y1,x2,y2 in line:
 		#All good lines
                 if (abs(y1 - y2) > 30 and abs(x2-x1) == 0) :
-                    h_v.append(((x1,y1),(x2,y2)))  
+                    h_v.append(((x1,y1),(x2,y2)))
                 if (abs(y1 - y2) == 0 and abs(x2-x1) > 10) :
-                    w_v.append(((x1,y1),(x2,y2)))  
+                    w_v.append(((x1,y1),(x2,y2)))
 
 
         # At least one intersection between verticle and horizontal lines
@@ -285,7 +289,7 @@ class TLIdentifier(object):
 	                cv2.line(image,h_v[j][0],h_v[j][1],(255,0,0),10)
 
 	                # Create a "color" binary image to combine with line image
-	                #color_edges = np.dstack((edge_detected_image, edge_detected_image, edge_detected_image)) 
+	                #color_edges = np.dstack((edge_detected_image, edge_detected_image, edge_detected_image))
 	                #combo = cv2.addWeighted(color_edges, 0.8, line_image, 1, 0)
 	                cv2.imshow('Rectangles',image)
 	                cv2.waitKey(0)
@@ -302,11 +306,11 @@ class TLIdentifier(object):
         _, contours, hierarchy = cv2.findContours(closed, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         #contour_list = []
-         
+
         for contour in contours:
   	    arc_len = cv2.arcLength( contour, True )
 	    approx = cv2.approxPolyDP( contour, 0.01 * arc_len, True )
-	    if cv2.contourArea( contour ) > 0 and len( approx )  > 0: 
+	    if cv2.contourArea( contour ) > 0 and len( approx )  > 0:
                 x,y,w,h = cv2.boundingRect(contour)
                 cv2.rectangle(image,(x,y),(x+w,y+h),(0,255,0),2)
 		if h > 2*w and w > 40 and h > 80:
@@ -315,15 +319,15 @@ class TLIdentifier(object):
 		        cv2.destroyAllWindows()
 
                         return True
-	
 
-        
+
+
         '''
             #approx = cv2.approxPolyDP(contour,0.01*cv2.arcLength(contour,True),True)
             #area = cv2.contourArea(contour)
             #if ((len(approx) > 15) & (len(approx) < 25) & (area > 200)  ) or (len(approx) == 4 ):
                 #contour_list.append(contour)
-        
+
         #areas = [cv2.contourArea(c) for c in contours]
         #max_index = np.argmax(areas)
         #cnt=contours[max_index]
@@ -334,15 +338,15 @@ class TLIdentifier(object):
 
     def find_colors(self,image):
         hsv_image = cv2.cvtColor(image,cv2.COLOR_RGB2HSV)
-        for indx in range(3):      
+        for indx in range(3):
             mask1 = cv2.inRange(hsv_image,self.lower_mask[indx],self.upper_mask[indx])
             if indx == 0:
                 mask2 = cv2.inRange(hsv_image,self.lower_mask[indx+3],self.upper_mask[indx+3])
                 mask = mask1 + mask2
-            else: 
+            else:
                 mask = mask1
             residual = cv2.bitwise_and(image,image,mask=mask)
-            result =  np.hstack([image, residual]) 
+            result =  np.hstack([image, residual])
             residual[residual > 0 ] = 100
             if np.sum(residual) > 1000 :
                 xlist = []
@@ -354,22 +358,22 @@ class TLIdentifier(object):
                             ylist.append(y)
                 yspan = max(ylist) - min(ylist)
                 xspan = max(xlist) - min(xlist)
-                if 3 < yspan < 30  and 3 < xspan < 30 : 
-                   if 0.8 < float(yspan)/xspan  < 1.2 and np.sum(residual)/xspan > 900 : # 
+                if 3 < yspan < 30  and 3 < xspan < 30 :
+                   if 0.8 < float(yspan)/xspan  < 1.2 and np.sum(residual)/xspan > 900 : #
                         #plt.imshow(result)
-                        #plt.title('Colors') 
-                        #plt.show()                                      
+                        #plt.title('Colors')
+                        #plt.show()
                         #plt.imsave(str(uuid.uuid4())+".jpg",result)
                         #residual[residual > 0] = 100
                         self.color = self.colorl[indx]
 		        return True
-        return False 
+        return False
 
 
 
 DEBUG = False
-if DEBUG == True:  
-    tl = TLIdentifier(1,'ALL','./traffic_light_identifier.h5')       
+if DEBUG == True:
+    tl = TLIdentifier(1,'ALL','./traffic_light_identifier.h5')
     tlc = TLClassifier('./traffic_light_classifier.h5')
 #    TL.resize_images('./images/unknown/','./images/resizeunknown/')
     images = tl.read_image_files('/home/student/bkup/')
@@ -378,9 +382,9 @@ if DEBUG == True:
         fimage = mpimg.imread(image)
         plt.imshow(fimage )
         plt.show()
- 
+
         fnd,result = tl.process_image(fimage)
-	
+
         if fnd == True:
             plt.imshow(result )
             plt.show()
