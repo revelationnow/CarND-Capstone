@@ -56,6 +56,7 @@ add_message_files(
   TrafficLightArray.msg
   Waypoint.msg
   Lane.msg
+  NextLight.msg
 )
 
 ## Generate services in the 'srv' folder
