@@ -215,6 +215,7 @@ class TLDetector(object):
             self.prev_light_loc = None
             return TrafficLight.UNKNOWN
 
+
         # Get Image
         self.camera_image.encoding = "rgb8"
         try:
@@ -226,6 +227,7 @@ class TLDetector(object):
         if DEBUG:
 
                 # If manual or data gathering mode get image ..state is known
+
 
                 #state = self.lights[self.light_cnt].state
                 found , light_image = self.light_identifier.process_image(cv_image)
@@ -284,16 +286,20 @@ class TLDetector(object):
             location and color
 
         Returns:
+
             int: index of waypoint closes to the upcoming stop line for a traffic light (999999 if none exists)
+
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
         light_positions = self.config['stop_line_positions']
         light = None
+
         self.light_cnt = None
         best_dist = 50
 
         if (self.pose) and (self.waypoints) :
+
 
             # Get the closest waypoint ahead of the car. Not a compulsory step -
             # can use the car pose instead but this mkes things easier later..

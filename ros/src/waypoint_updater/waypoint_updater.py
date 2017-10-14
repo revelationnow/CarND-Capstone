@@ -289,10 +289,12 @@ class WaypointUpdater(object):
         i = self._traffic_waypoint_id
         for waypoint in self._waypoints.waypoints:
             dist = self._dl(self._stop_line_position, waypoint.pose.pose.position)
+
             if (dist < min_dist):
                 min_dist = dist
                 stop_waypoint_id = i
             i = i - 1
+
             stop_waypoint_id = stop_waypoint_id - 2   # margin N: stop about N points timeslots before the stop line
             self._stop_waypoint_id = stop_waypoint_id
 
@@ -319,6 +321,7 @@ class WaypointUpdater(object):
             else:
                 delta_t = self._waypoints.waypoints[i+1].twist.header.stamp-self._waypoints.waypoints[i].twist.header.stamp
                 self._waypoints.waypoints[i].twist.twist.linear.x = self._base_vel - deceleration * delta_t
+
 
             final_wps.append(self._waypoints.waypoints[i])
 
